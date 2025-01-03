@@ -1,92 +1,123 @@
 import yt_dlp
 import os
+from pathlib import Path
+from typing import Optional, Literal, Dict, Any
 from urllib.parse import urlparse, parse_qs
+from tqdm import tqdm
 
-def get_youtube_playlist_id(url):
-    parsed_url = urlparse(url)
-    if 'youtube.com' in parsed_url.netloc:
-        query_params = parse_qs(parsed_url.query)
-        return query_params.get('list', [None])[0]
-    return None
+class YouTubeDownloader:
+    def __init__(self, output_dir: str):
+        self.output_dir = Path(output_dir)
+        self._setup_options()
+        self.current_progress_bar = None
 
-def download_video(url, output_dir, format_type='video'):
-    video_format = {
-        'video': {
-            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best',
-            'outtmpl': os.path.join(output_dir, '%(title)s [%(height)sp].%(ext)s'),
-            'merge_output_format': 'avi',
-            'postprocessors': [{
-                'key': 'FFmpegVideoConvertor',
-                'preferedformat': 'avi'
-            }],
-            'postprocessor_args': {
-                'FFmpegVideoConvertor': ['-codec:v', 'mpeg4', '-codec:a', 'mp3', '-q:v', '0']
-            }
-        },
-        'audio': {
-            'format': 'bestaudio/best',
-            'outtmpl': os.path.join(output_dir, '%(title)s.%(ext)s'),
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'flac',
-                'preferredquality': '0',
-            }],
-            'postprocessor_args': {
-                'FFmpegExtractAudio': ['-acodec', 'flac', '-ar', '96000', '-sample_fmt', 's32', '-ac', '2']
+    def _setup_options(self):
+        """Setup download format options."""
+        self.supported_formats = {
+            'video': {
+                'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best',
+                'merge_output_format': 'avi',
+                'postprocessors': [{
+                    'key': 'FFmpegVideoConvertor',
+                    'preferedformat': 'avi'
+                }],
+                'ffmpeg_args': ['-codec:v', 'mpeg4', '-codec:a', 'mp3', '-q:v', '0']
+            },
+            'audio': {
+                'format': 'bestaudio/best',
+                'postprocessors': [{
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'flac',
+                    'preferredquality': '0'
+                }],
+                'postprocessor_args': {
+                    'FFmpegExtractAudio': ['-acodec', 'flac', '-ar', '96000', '-sample_fmt', 's32', '-ac', '2']
+                }
             }
         }
-    }
 
-    ydl_opts = {
-        **video_format[format_type],
-        'ignoreerrors': True,
-        'verbose': True,
-        'prefer_ffmpeg': True,
-        'geo_bypass': True,
-    }
+    def _progress_hook(self, d):
+        """Custom progress hook for download progress."""
+        if d['status'] == 'downloading':
+            if not self.current_progress_bar:
+                total = d.get('total_bytes') or d.get('total_bytes_estimate', 0)
+                self.current_progress_bar = tqdm(
+                    total=total,
+                    unit='B',
+                    unit_scale=True,
+                    desc="Downloading",
+                    ncols=80
+                )
+            downloaded = d.get('downloaded_bytes', 0)
+            self.current_progress_bar.update(downloaded - self.current_progress_bar.n)
+        
+        elif d['status'] == 'finished':
+            if self.current_progress_bar:
+                self.current_progress_bar.close()
+                self.current_progress_bar = None
+                print("\nProcessing downloaded content...")
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+    def _get_youtube_playlist_id(self, url: str) -> Optional[str]:
+        """Extract playlist ID from YouTube URL."""
+        parsed_url = urlparse(url)
+        if 'youtube.com' in parsed_url.netloc:
+            query_params = parse_qs(parsed_url.query)
+            return query_params.get('list', [None])[0]
+        return None
+
+    def _get_download_options(self, format_type: Literal['video', 'audio']) -> Dict[str, Any]:
+        """Get download options based on format type."""
+        format_options = self.supported_formats[format_type].copy()
+        format_options.update({
+            'outtmpl': str(self.output_dir / '%(title)s [%(height)sp].%(ext)s'),
+            'ignoreerrors': True,
+            'quiet': True,
+            'no_warnings': True,
+            'prefer_ffmpeg': True,
+            'geo_bypass': True,
+            'progress_hooks': [self._progress_hook],
+        })
+        return format_options
+
+    def download_video(self, url: str, format_type: Literal['video', 'audio'] = 'video') -> bool:
+        """Download a single video."""
         try:
-            print(f"\nExtracting {'video' if format_type == 'video' else 'audio'} information...")
-            info = ydl.extract_info(url, download=True)
-            if info:
-                print(f"\nSuccessfully downloaded: {info.get('title', 'Unknown Title')}")
-                if format_type == 'video':
-                    print(f"Resolution: {info.get('height', 'unknown')}p")
-                print(f"Format: {info.get('ext', 'unknown')}")
-            return True
+            with yt_dlp.YoutubeDL(self._get_download_options(format_type)) as ydl:
+                info = ydl.extract_info(url, download=True)
+                if info:
+                    print(f"\nDownload Complete!")
+                    print(f"Title: {info.get('title', 'Unknown')}")
+                    if format_type == 'video':
+                        print(f"Quality: {info.get('height', 'unknown')}p")
+                    print(f"Format: {info.get('ext', 'unknown')}")
+                return True
         except Exception as e:
-            print(f"Error downloading {url}: {str(e)}")
+            print(f"\nError downloading {url}: {str(e)}")
             return False
 
-def download_playlist(url, output_dir, format_type='video'):
-    ydl_opts = {
-        'extract_flat': 'in_playlist',
-        'ignoreerrors': True
-    }
-    
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+    def download_playlist(self, url: str, format_type: Literal['video', 'audio'] = 'video') -> bool:
+        """Download a playlist."""
         try:
-            info = ydl.extract_info(url, download=False)
-            if 'entries' in info:
-                total = len(info['entries'])
-                print(f"\nFound {total} videos in playlist")
-                for i, entry in enumerate(info['entries'], 1):
-                    if entry:
-                        title = entry.get('title', 'Unknown Title')
-                        print(f"\nProcessing {i}/{total}: {title}")
-                        download_video(entry['url'], output_dir, format_type)
-            return True
+            with yt_dlp.YoutubeDL({'extract_flat': 'in_playlist', 'quiet': True}) as ydl:
+                info = ydl.extract_info(url, download=False)
+                if 'entries' in info:
+                    total = len(info['entries'])
+                    print(f"\nFound {total} videos in playlist")
+                    
+                    for i, entry in enumerate(info['entries'], 1):
+                        if entry:
+                            print(f"\nProcessing video {i}/{total}")
+                            self.download_video(entry['url'], format_type)
+                return True
         except Exception as e:
-            print(f"Error processing playlist {url}: {str(e)}")
+            print(f"\nError processing playlist {url}: {str(e)}")
             return False
 
 def main():
-    print("YouTube High Quality Downloader")
-    print("-" * 30)
+    print("\n=== YouTube Downloader ===")
     
     while True:
-        url = input("Enter YouTube URL (or 'q' to quit): ").strip()
+        url = input("\nEnter YouTube URL (or 'q' to quit): ").strip()
         if url.lower() == 'q':
             break
             
@@ -94,41 +125,40 @@ def main():
             print("Error: Please enter a valid YouTube URL")
             continue
             
-        output_dir = input("Enter the full output directory path: ").strip()
+        output_dir = input("Enter output directory path: ").strip()
         if not output_dir:
             print("Error: Output directory path is required")
             continue
             
-        while True:
-            print("\nChoose download format:")
-            print("1. Video (up to 4K quality)")
-            print("2. Audio only (FLAC format)")
-            choice = input("Enter your choice (1 or 2): ").strip()
-            
-            if choice in ["1", "2"]:
-                format_type = "video" if choice == "1" else "audio"
-                break
-            print("Invalid choice. Please enter 1 or 2.")
-
-        try:
-            os.makedirs(output_dir, exist_ok=True)
-        except Exception as e:
-            print(f"Error creating directory: {str(e)}")
-            continue
+        format_type = None
+        while format_type not in ['1', '2']:
+            print("\nSelect download format:")
+            print("1. Video (High Quality AVI)")
+            print("2. Audio only (High Quality FLAC)")
+            format_type = input("Enter your choice (1 or 2): ").strip()
+        
+        format_type = 'video' if format_type == '1' else 'audio'
         
         try:
-            if get_youtube_playlist_id(url):
-                download_playlist(url, output_dir, format_type)
+            os.makedirs(output_dir, exist_ok=True)
+            downloader = YouTubeDownloader(output_dir)
+            
+            if downloader._get_youtube_playlist_id(url):
+                downloader.download_playlist(url, format_type)
             else:
-                download_video(url, output_dir, format_type)
+                downloader.download_video(url, format_type)
+                
         except KeyboardInterrupt:
             print("\nDownload canceled by user")
             continue
-        
-        print("\nDownload complete!")
+        except Exception as e:
+            print(f"\nAn error occurred: {str(e)}")
+            continue
         
         if input("\nDownload another? (y/n): ").lower() != 'y':
             break
+
+    print("\nThank you for using YT-Harvester!")
 
 if __name__ == "__main__":
     try:
