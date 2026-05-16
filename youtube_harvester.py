@@ -5,6 +5,8 @@ from typing import Optional, Literal, Dict, Any
 from urllib.parse import urlparse, parse_qs
 from tqdm import tqdm
 
+FORMAT_TYPES = Literal['video', 'audio', 'video_4k', 'audio_mp3']
+
 class YouTubeDownloader:
     def __init__(self, output_dir: str):
         self.output_dir = Path(output_dir)
@@ -32,6 +34,46 @@ class YouTubeDownloader:
                 }],
                 'postprocessor_args': {
                     'FFmpegExtractAudio': ['-acodec', 'flac', '-ar', '96000', '-sample_fmt', 's32', '-ac', '2']
+                }
+            },
+            # Option 3: Extreme quality 4K MP4 — prefers 2160p, falls back to best available
+            'video_4k': {
+                'format': (
+                    'bestvideo[height<=2160][ext=mp4]+bestaudio[ext=m4a]/'
+                    'bestvideo[height<=2160]+bestaudio/'
+                    'bestvideo[ext=mp4]+bestaudio[ext=m4a]/'
+                    'bestvideo+bestaudio/best'
+                ),
+                'merge_output_format': 'mp4',
+                'postprocessors': [{
+                    'key': 'FFmpegVideoConvertor',
+                    'preferedformat': 'mp4'
+                }],
+                # Copy streams when possible to avoid re-encoding quality loss;
+                # fall back to libx264 (high profile) only if copy isn't viable.
+                'ffmpeg_args': [
+                    '-c:v', 'copy',
+                    '-c:a', 'aac',
+                    '-b:a', '320k',
+                    '-movflags', '+faststart'
+                ]
+            },
+            # Option 4: High quality MP3 at 320 kbps
+            'audio_mp3': {
+                'format': 'bestaudio/best',
+                'postprocessors': [{
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'mp3',
+                    'preferredquality': '320'          # 320 kbps CBR
+                }],
+                'postprocessor_args': {
+                    'FFmpegExtractAudio': [
+                        '-acodec', 'libmp3lame',
+                        '-b:a', '320k',
+                        '-ar', '48000',                # 48 kHz sample rate
+                        '-ac', '2',                    # stereo
+                        '-id3v2_version', '3'          # broad compatibility tags
+                    ]
                 }
             }
         }
@@ -65,7 +107,7 @@ class YouTubeDownloader:
             return query_params.get('list', [None])[0]
         return None
 
-    def _get_download_options(self, format_type: Literal['video', 'audio']) -> Dict[str, Any]:
+    def _get_download_options(self, format_type: FORMAT_TYPES) -> Dict[str, Any]:
         """Get download options based on format type."""
         format_options = self.supported_formats[format_type].copy()
         format_options.update({
@@ -79,7 +121,7 @@ class YouTubeDownloader:
         })
         return format_options
 
-    def download_video(self, url: str, format_type: Literal['video', 'audio'] = 'video') -> bool:
+    def download_video(self, url: str, format_type: FORMAT_TYPES = 'video') -> bool:
         """Download a single video."""
         try:
             with yt_dlp.YoutubeDL(self._get_download_options(format_type)) as ydl:
@@ -87,7 +129,7 @@ class YouTubeDownloader:
                 if info:
                     print(f"\nDownload Complete!")
                     print(f"Title: {info.get('title', 'Unknown')}")
-                    if format_type == 'video':
+                    if format_type in ('video', 'video_4k'):
                         print(f"Quality: {info.get('height', 'unknown')}p")
                     print(f"Format: {info.get('ext', 'unknown')}")
                 return True
@@ -95,7 +137,7 @@ class YouTubeDownloader:
             print(f"\nError downloading {url}: {str(e)}")
             return False
 
-    def download_playlist(self, url: str, format_type: Literal['video', 'audio'] = 'video') -> bool:
+    def download_playlist(self, url: str, format_type: FORMAT_TYPES = 'video') -> bool:
         """Download a playlist."""
         try:
             with yt_dlp.YoutubeDL({'extract_flat': 'in_playlist', 'quiet': True}) as ydl:
@@ -125,19 +167,27 @@ def main():
             print("Error: Please enter a valid YouTube URL")
             continue
             
-        output_dir = input("Enter output directory path: ").strip()
+        output_dir = input("Enter output directory path (or press ENTER for current directory): ").strip()
         if not output_dir:
-            print("Error: Output directory path is required")
-            continue
-            
-        format_type = None
-        while format_type not in ['1', '2']:
+            output_dir = os.getcwd()
+            print(f"Using current directory: {output_dir}")
+
+        format_choice = None
+        while format_choice not in ['1', '2', '3', '4']:
             print("\nSelect download format:")
-            print("1. Video (High Quality AVI)")
-            print("2. Audio only (High Quality FLAC)")
-            format_type = input("Enter your choice (1 or 2): ").strip()
-        
-        format_type = 'video' if format_type == '1' else 'audio'
+            print("1. Video  — High Quality AVI")
+            print("2. Audio  — Lossless FLAC (96 kHz / 32-bit)")
+            print("3. Video  — Extreme Quality MP4 (4K/2160p if available)")
+            print("4. Audio  — High Quality MP3 (320 kbps)")
+            format_choice = input("Enter your choice (1-4): ").strip()
+
+        format_map = {
+            '1': 'video',
+            '2': 'audio',
+            '3': 'video_4k',
+            '4': 'audio_mp3'
+        }
+        format_type = format_map[format_choice]
         
         try:
             os.makedirs(output_dir, exist_ok=True)
