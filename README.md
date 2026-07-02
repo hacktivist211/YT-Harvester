@@ -1,154 +1,462 @@
 # YT-Harvester
 
-A Python-powered tool for downloading high-quality videos and audio from YouTube, supporting playlists, multiple formats, and seamless FFmpeg integration.
+A high-performance command-line toolkit built on top of **yt-dlp** for downloading YouTube content with advanced workflow automation. The project provides multiple specialized utilities for downloading videos, extracting high-quality audio, downloading complete playlists, and creating timestamp-based media segments without manually editing videos.
+
+Unlike generic downloaders, **YT-Harvester** focuses on reliability, download monitoring, organized output generation, playlist handling, and precise media extraction through FFmpeg integration.
+
+---
 
 ## Features
 
-- Download videos in up to 4K resolution (where available)
-- Extract high-quality audio in FLAC format (96kHz, 32-bit)
-- Support for both playlists and individual videos
-- Automatic format detection and conversion
-- Simple command-line interface
-- Progress tracking for playlist downloads
+### High Quality Video Downloads
 
-## Prerequisites
+- Downloads the highest quality video and audio streams available.
+- Automatic stream merging.
+- Intelligent quality fallback when the preferred format is unavailable.
+- Preserves original media quality whenever possible.
 
-### 1. Python Installation
-- Python 3.7 or higher required
-- Download from [Python.org](https://www.python.org/downloads/)
-- Verify installation with: `python --version`
+---
 
-### 2. Required Python Packages
-Install all dependencies using pip:
-```bash
-pip install yt-dlp
+### High Quality Audio Extraction
+
+- Extracts audio directly from YouTube videos.
+- Converts audio into MP3 using FFmpeg.
+- Maintains high bitrate output.
+- Suitable for music libraries, podcasts, lectures, and archival purposes.
+
+---
+
+### Playlist Downloader
+
+- Downloads entire YouTube playlists automatically.
+- Creates organized directory structures based on playlist titles.
+- Handles unavailable or private videos gracefully.
+- Continues downloading remaining videos even if individual downloads fail.
+
+---
+
+### Timestamp-Based Segment Extraction
+
+One of the primary features of this repository.
+
+Instead of downloading an entire video and manually trimming it afterwards, users can specify one or more timestamp ranges.
+
+Example:
+
+```
+00:01:30 → 00:05:20
+00:15:10 → 00:18:45
+01:03:40 → 01:08:00
 ```
 
-### 3. FFmpeg Installation
+YT-Harvester automatically extracts each segment into independent media files.
 
-#### Windows
-1. **Download FFmpeg**
-   - Visit [FFmpeg GitHub Releases](https://github.com/BtbN/FFmpeg-Builds/releases)
-   - Download `ffmpeg-master-latest-win64-gpl.zip`
+Supports:
 
-2. **Installation Steps**
-   - Create folder: `C:\Program Files\FFmpeg`
-   - Extract the ZIP contents
-   - Copy all files from the `bin` folder to `C:\Program Files\FFmpeg`
+- Multiple timestamp ranges
+- Video segment extraction
+- Audio-only segment extraction
+- Single videos
+- Entire playlists
 
-3. **Add to System PATH**
-   - Open System Properties (`Windows + R`, type `sysdm.cpl`)
-   - Navigate to Advanced → Environment Variables
-   - Under System Variables, edit `Path`
-   - Add new entry: `C:\Program Files\FFmpeg`
-   - Click OK on all windows
+---
 
-4. **Verify Installation**
-   ```bash
-   ffmpeg -version
-   ```
+### Intelligent Progress Monitoring
 
-#### macOS
-Using Homebrew:
+Unlike the default yt-dlp output, YT-Harvester provides cleaner terminal progress visualization.
+
+Features include:
+
+- Overall playlist progress
+- Per-video progress bars
+- Segment progress tracking
+- Download completion statistics
+- Automatic cleanup of completed progress bars
+
+---
+
+### Fault Tolerance
+
+The downloader is designed to recover from common failures.
+
+Includes:
+
+- Automatic retries
+- Fragment retries
+- Extractor retries
+- Download continuation
+- Graceful handling of unavailable videos
+- Quality fallback mechanism
+
+---
+
+### Organized Output
+
+Downloads are automatically categorized into structured directories.
+
+Examples include:
+
+- Videos
+- Audio
+- Playlists
+- Timestamp Segments
+
+Generated filenames preserve useful metadata such as:
+
+- Video title
+- Playlist title
+- Playlist index
+- Video ID
+- Timestamp range
+
+---
+
+# Repository Components
+
+The repository currently contains three independent utilities.
+
+---
+
+## 1. General YouTube Downloader
+
+Provides:
+
+- Single video downloads
+- Playlist downloads
+- Audio extraction
+- Progress bars
+- Browser cookie support
+- Automatic stream merging
+
+Ideal for everyday downloading.
+
+---
+
+## 2. Playlist Downloader
+
+Optimized specifically for downloading complete playlists.
+
+Capabilities include:
+
+- Individual video progress tracking
+- Playlist-wide progress monitoring
+- Retry logic
+- Automatic directory creation
+- Download continuation
+- High-quality video downloads
+
+---
+
+## 3. Timestamp Media Downloader
+
+Provides precise media extraction.
+
+Capabilities include:
+
+- Video clipping
+- Audio clipping
+- Multiple timestamp ranges
+- Playlist timestamp extraction
+- FFmpeg-based segment creation
+- Independent output files for each segment
+
+Useful for:
+
+- Lecture extraction
+- Music clips
+- Podcasts
+- Educational content
+- Highlight generation
+- Research datasets
+
+---
+
+# Technology Stack
+
+- Python 3
+- yt-dlp
+- FFmpeg
+- tqdm
+- pathlib
+- threading
+
+---
+
+# Requirements
+
+- Python 3.9+
+- FFmpeg installed and accessible from PATH
+- Internet connection
+
+---
+
+# Installation
+
+Clone the repository:
+
 ```bash
-brew install ffmpeg
+git clone https://github.com/hacktivist211/YT-Harvester.git
+
+cd YT-Harvester
 ```
 
-#### Linux (Ubuntu/Debian)
+Install dependencies:
+
 ```bash
-sudo apt update
-sudo apt install ffmpeg
+pip install yt-dlp tqdm
 ```
 
-## Usage Instructions
+Install FFmpeg.
 
-1. **Start the Program**
-   ```bash
-   python youtube_harvester.py
-   ```
+Verify installation:
 
-2. **Enter Video URL**
-   - For single video: `https://www.youtube.com/watch?v=videoID`
-   - For playlist: `https://www.youtube.com/playlist?list=playlistID`
-
-3. **Specify Output Directory**
-   - Enter the full path where files should be saved
-   - Example: `C:\Downloads\YouTube` or `/home/user/downloads`
-
-4. **Select Format**
-   ```
-   Choose download format:
-   1. Video (up to 4K quality)
-   2. Audio only (FLAC format)
-   ```
-
-## Example Usage
-
-### Single Video Download
 ```bash
-Enter YouTube URL: https://www.youtube.com/watch?v=videoID
-Enter the full output directory path: C:\Downloads\YouTube
-Choose download format:
-1. Video (up to 4K quality)
-2. Audio only (FLAC format)
-Enter your choice (1 or 2): 1
+ffmpeg -version
 ```
 
-### Playlist Download
+---
+
+# Usage
+
+Each utility is designed to run independently.
+
+---
+
+## General Downloader
+
 ```bash
-Enter YouTube URL: https://www.youtube.com/playlist?list=playlistID
-Enter the full output directory path: C:\Downloads\YouTube\Playlist
-Choose download format:
-1. Video (up to 4K quality)
-2. Audio only (FLAC format)
-Enter your choice (1 or 2): 2
+python qwertyui.py
 ```
 
-## Format Specifications
+Example session:
 
-### Video
-- Container: AVI
-- Video Codec: MPEG-4
-- Quality: Up to 4K (2160p)
-- Filename format: `Title [Resolution].avi`
+```
+Choose an option:
 
-### Audio
-- Format: FLAC
-- Sample Rate: 96kHz
-- Bit Depth: 32-bit
-- Channels: Stereo
-- Filename format: `Title.flac`
+1. Download single video
+2. Download playlist
+3. Extract audio only
+```
 
-## Troubleshooting
+---
 
-1. **FFmpeg Not Found**
-   - Verify FFmpeg is in PATH
-   - Restart terminal/command prompt
-   - Restart computer if needed
+### Download a Single Video
 
-2. **Permission Errors**
-   - Ensure write permissions in output directory
-   - Run command prompt as administrator (Windows)
-   - Use sudo (Linux/macOS)
+```text
+Option:
+1
 
-3. **Download Errors**
-   - Check internet connection
-   - Verify YouTube URL is accessible
-   - Update yt-dlp: `pip install --upgrade yt-dlp`
+URL:
+https://www.youtube.com/watch?v=dQw4w9WgXcQ
+```
 
-## License
+---
 
-This project is licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.
+### Download a Playlist
 
-## Contributing
+```text
+Option:
+2
 
-1. Fork the repository
-2. Create your feature branch: `git checkout -b feature/NewFeature`
-3. Commit your changes: `git commit -m 'Add NewFeature'`
-4. Push to the branch: `git push origin feature/NewFeature`
-5. Submit a pull request
+URL:
+https://www.youtube.com/playlist?list=PLxxxxxxxxxxxxxxxx
+```
 
-## Acknowledgments
+---
 
-- [yt-dlp](https://github.com/yt-dlp/yt-dlp) for the core downloading functionality
-- [FFmpeg](https://ffmpeg.org/) for media processing capabilities
+### Extract MP3 Audio
+
+```text
+Option:
+3
+
+URL:
+https://www.youtube.com/watch?v=dQw4w9WgXcQ
+```
+
+---
+
+## Playlist Downloader
+
+Run:
+
+```bash
+python Download_High_quality_songs.py
+```
+
+Example:
+
+```text
+Enter YouTube playlist URL:
+
+https://www.youtube.com/playlist?list=PLxxxxxxxxxxxx
+```
+
+The downloader automatically:
+
+- Retrieves playlist metadata
+- Displays playlist size
+- Downloads every available video
+- Tracks overall completion
+- Saves files into organized directories
+
+---
+
+## Timestamp Downloader
+
+Run:
+
+```bash
+python "Timestamps_High_quality_songs._and_Videos(4K).py"
+```
+
+Example:
+
+```
+Enter URL:
+
+https://www.youtube.com/watch?v=xxxxxxxx
+
+Download specific timestamps?
+
+y
+```
+
+Example timestamps:
+
+```
+Start:
+00:01:30
+
+End:
+00:04:20
+```
+
+Second segment:
+
+```
+Start:
+00:12:10
+
+End:
+00:18:40
+```
+
+The program creates two independent media files corresponding to the requested intervals.
+
+---
+
+# Timestamp Formats
+
+YT-Harvester accepts multiple timestamp formats.
+
+Examples:
+
+```text
+90
+
+01:30
+
+00:01:30
+
+02:15:45
+```
+
+All are parsed automatically.
+
+---
+
+# Supported URLs
+
+- Standard YouTube videos
+- YouTube playlists
+- Public playlists
+- Music videos
+- Educational videos
+- Long-form content
+
+---
+
+# Error Recovery
+
+YT-Harvester automatically handles:
+
+- Interrupted downloads
+- Temporary network failures
+- Fragment download failures
+- Playlist entries that are unavailable
+- Unsupported stream formats
+- Retry attempts before terminating
+
+---
+
+# Performance
+
+The toolkit minimizes unnecessary overhead by:
+
+- Streaming directly through yt-dlp
+- Using FFmpeg only when media processing is required
+- Avoiding unnecessary intermediate files
+- Tracking downloads efficiently using lightweight progress hooks
+
+---
+
+# Example Commands
+
+Download a single video:
+
+```bash
+python qwertyui.py
+```
+
+Download an entire playlist:
+
+```bash
+python Download_High_quality_songs.py
+```
+
+Extract timestamp clips:
+
+```bash
+python "Timestamps_High_quality_songs._and_Videos(4K).py"
+```
+
+Install dependencies:
+
+```bash
+pip install yt-dlp tqdm
+```
+
+Verify FFmpeg:
+
+```bash
+ffmpeg -version
+```
+
+Clone repository:
+
+```bash
+git clone https://github.com/hacktivist211/YT-Harvester.git
+```
+
+---
+
+# Future Improvements
+
+- Batch URL processing
+- Concurrent download scheduling
+- Download queue management
+- Automatic subtitle downloading
+- Metadata export
+- SponsorBlock integration
+- GUI frontend
+- Download history database
+- Configuration file support
+- Parallel playlist downloads
+- Automatic thumbnail embedding
+
+---
+
+# Disclaimer
+
+YT-Harvester is intended for educational, research, and archival purposes. Users are responsible for ensuring that downloaded content complies with YouTube's Terms of Service and all applicable copyright laws within their jurisdiction.
