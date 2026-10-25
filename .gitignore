@@ -1,0 +1,16 @@
+# YT-Harvester runtime artifacts
+downloads/
+runs/
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+archive.txt
+session.vault
+staging/
+.part
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+build/
+dist/
